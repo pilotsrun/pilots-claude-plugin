@@ -9,7 +9,7 @@
     "url": "https://pilots.run"
   },
   "homepage": "https://pilots.run/agents",
-  "repository": "https://github.com/pilotsrun/pilots",
+  "repository": "https://github.com/pilotsrun/pilots-claude-plugin",
   "license": "Apache-2.0",
   "keywords": [
     "pilots",
