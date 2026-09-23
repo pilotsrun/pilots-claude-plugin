@@ -10,7 +10,7 @@ service are the same machine with different lifecycle knobs.
 ## Install
 
 ```
-/plugin marketplace add pilotsrun/claude-plugin
+/plugin marketplace add pilotsrun/pilots-claude-plugin
 /plugin install pilots@pilots
 ```
 
