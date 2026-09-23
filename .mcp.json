@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "pilots": {
+      "type": "http",
+      "url": "${PILOT_API_URL:-https://api.pilotrun.app}/mcp",
+      "headersHelper": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/mcp-headers.py"
+    }
+  }
+}
