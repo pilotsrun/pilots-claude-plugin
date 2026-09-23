@@ -68,7 +68,7 @@ the prefix comes back with the prefixed name spelled out.
 ## The Claude Code plugin
 
 ```
-/plugin marketplace add pilotsrun/pilots
+/plugin marketplace add pilotsrun/pilots-claude-plugin
 /plugin install pilots@pilots
 ```
 
