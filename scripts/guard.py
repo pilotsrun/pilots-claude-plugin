@@ -96,8 +96,16 @@ def exec_command(tool_input: dict[str, Any]) -> str:
     return json.dumps(tool_input, sort_keys=True)
 
 
+# Permission modes in which the person has already said "do not ask me".
+# Claude Code sends the session's mode in every hook payload; asking anyway
+# would interrupt someone who chose to run unattended.
+UNATTENDED_MODES = {"bypassPermissions"}
+
+
 def main() -> int:
     payload = read_payload()
+    if payload.get("permission_mode") in UNATTENDED_MODES:
+        return 0
     name = tool_basename(str(payload.get("tool_name", "")))
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
