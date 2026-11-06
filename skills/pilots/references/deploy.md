@@ -16,7 +16,22 @@ MCP: `deploy` with `{ "dir": "<absolute path>" }`. Nothing else is required.
 1. The directory is tarred, with `.dockerignore` honoured and `.git` skipped, and posted to `POST /v1/plan`.
 2. The host answers with a plan: one step per service, each saying where it came from. Order, first hit wins: a compose file, then a `Dockerfile`, then a recipe, then `unknown`.
 3. Each step is built with `POST /v1/builds`, the service is created or updated, the release is deployed and health-gated.
-4. The result is `{ app, services: [{ name, url, release_id }], next }`.
+4. The result is `{ app, services: [{ name, url, release_id, status, error? }], next }`.
+
+## Redeploying, and deploying some services
+
+A second deploy of the same directory keeps every service whose build context, Dockerfile, compose configuration and secret values are unchanged since its current release: it is not rebuilt and not restarted, and the log says `unchanged, kept rel_...`. A database is never restarted because its web service changed. `--force` (MCP: `force: true`) deploys it anyway. A volume-backed service whose machine has checkpoints is refused with 409 (a checkpoint is a diff against the image a deploy replaces); `--drop-checkpoints` (MCP: `drop_checkpoints: true`, after asking the user) deletes them first.
+
+    pilot deploy . web          # only web; every other service is left as it is
+    pilot deploy web worker     # the directory is the current one when the first name is not a directory
+    pilot deploy --force        # rebuild and restart even what has not changed
+    pilot deploy --drop-checkpoints  # delete each service's machine checkpoints first
+
+MCP: `deploy` with `{ "dir": "...", "services": ["web"] }`.
+
+One service failing does not stop the others; a service that `depends_on` a failed one is skipped, because it would start against a dependency that is missing or broken. Each service's `status` is `deployed`, `unchanged`, `failed` or `skipped`, and the command exits non-zero when any failed or was skipped. Fix the failure, then deploy just those services.
+
+If the connection drops in the middle of a deploy (a host restarting during a fleet update), `pilot deploy` reads what the fleet did with the call and only asks again when nothing says it happened, so a retry never deploys the same build twice.
 
 ## What the platform detects
 
@@ -62,22 +77,27 @@ When you write a Dockerfile yourself:
 1. bind `0.0.0.0`, never `127.0.0.1`;
 2. read the port from `$PORT`, with 8080 as the fallback.
 
-Both mistakes build cleanly and answer 502. `127.0.0.1` is right in exactly one place, a `HEALTHCHECK` probe, which runs inside the guest.
+Both mistakes build cleanly and answer 503 `not_listening`. `127.0.0.1` is right in exactly one place, a `HEALTHCHECK` probe, which runs inside the guest.
 
 ## Each answer and what to do
 
 | Answer | Meaning | Do |
 | --- | --- | --- |
-| `services[].url` | deployed and healthy | report the URL; stop |
+| `services[].url` | deployed and healthy, or `unchanged` and still running | report the URL; stop |
+| `services[].status` `failed` or `skipped` | that service did not deploy; the others did what their status says | read its `error`, fix it, deploy again with `services` set to the ones that did not deploy |
 | `unknown_framework` | no compose file, no Dockerfile, no recipe | read `details.listing` and `details.manifests`, write a Dockerfile obeying `details.rules`, call `build` with it, then `deploy` with `name` and `build` |
 | `plan_unsupported` | the compose file asks for something pilots does not do | fix each key in `details.unsupported`; every one is named |
 | `plan_multi_service` | a push tried to deploy a repository with more than one app | commit a compose file and deploy it with `pilot deploy` |
 | `build_failed` | the build stopped; every log line is in the error | read the line carrying `error`, fix the Dockerfile, `build` again |
-| `health_gate_failed`, 422 | the app never answered its health check | `diagnose` with `details.replica`; it is usually the port or the bind address |
-| `quota_exceeded`, 429 | the org is at a limit | `next` names the limit; destroy something or ask an admin |
+| `health_gate_failed`, 422 | the app never answered its health check | read `details.console`, then `diagnose` with `details.replica`; it is usually the port or the bind address |
+| `no_capacity`, 507 | the fleet has no room right now; not an account limit, there is none | retry shortly, or ask for a smaller machine |
 
 ## Do not
 
 - Do not run `generate_dockerfile` before `deploy`. `deploy` already does it.
 - Do not set `port`. The recipe sets 8080 and the platform passes it.
 - Do not deploy a second time to retry a 422. Read `diagnose` first.
+
+## Build log lines
+
+A build streams NDJSON, one `{step, stream, line, ts}` per line. BuildKit's bookkeeping (the cache import and export steps, `[internal]` loads, the client's own `level=warning` lines such as the fsverity probe) carries `level: "verbose"` and is left off the stream unless asked for: `?verbose=1` on `POST /v1/builds` or `GET /v1/builds/{id}/logs`, `pilot deploy --verbose`, `verbose: true` on the SDKs' build and log calls, or `verbose` on the `build_logs` tool. Every line is recorded either way.

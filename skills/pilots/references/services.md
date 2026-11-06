@@ -41,7 +41,7 @@ A `path` job is an ordinary request, so it needs a machine that can wake: `auto_
 
 What the handler sees is a `GET` carrying `X-Pilot-Cron: <expression>`. The public edge strips that header from every outside request, so `if (!req.headers['x-pilot-cron']) return 403` is the whole check, with no secret to keep. A job can fire twice in rare cases (a host restart or a deploy inside its minute), so make it idempotent; a job still running when its next minute comes is skipped, not overlapped. One replica fires for a service, however many it has. To remove every cron, deploy with `schedules: []` (or `crons: []`); an absent key keeps the previous release's.
 
-A replica with no traffic suspends after about 30 seconds of quiet and the next request wakes it; that is the default and it costs nothing while asleep. A worker that must keep running with nothing connected to it -- a queue consumer, a scheduler -- keeps one replica resident with `x-pilots: min_machines_running: 1` in its compose entry (or `auto_stop: off`). The scale-down window is the autoscaler's and is not a knob; `idle_timeout` is the sandbox timer (sandboxes.md). The keys are listed in compose.md.
+A replica with no traffic suspends after about 30 seconds of quiet and the next request wakes it; that is the default and it costs nothing while asleep. A worker that must keep running with nothing connected to it -- a queue consumer, a scheduler -- keeps one replica resident with `x-pilots: min_machines_running: 1` in its compose entry (or `auto_stop: off`). The scale-down window is the autoscaler's and is not a knob; `idle_timeout` is the sandbox timer (sandboxes.md). Under load the autoscaler adds replicas when every running one is at `soft_limit`, as many as the load in flight needs in one pass, up to `max_machines_running`, and places each new one on the host holding the fewest of the service's replicas. `pilot service set web --min-machines 1 --max-machines 6` changes the policy in place without a restart. The keys are listed in compose.md.
 
 ## Databases
 
@@ -51,10 +51,10 @@ The recipe carries a `pilot.engine` label, which is what makes the rest of this 
 
 | I need to... | Command | Note |
 | --- | --- | --- |
-| add one | `pilot add postgres` | writes the entry, the password and the durability statement; read that statement |
+| add one | `pilot add postgres`, or the `add_database` tool on `pilot mcp` | writes the entry, the password and the durability statement; read that statement. The password never reaches the tool's answer |
 | a session on it | `pilot db connect` | the engine's own client, over a tunnel, or inside the machine if you have neither the client nor the password |
 | what the engine says | `pilot metrics <service>` | connections against the limit, cache hits, commits against rollbacks |
-| recover to a moment | `pilot db restore <service> --to <RFC3339>` | Postgres in wal-archive mode; runs as a NEW service beside the old one |
+| recover to a moment | `pilot db restore <service> --to <RFC3339>`, or the `db_restore` tool | Postgres in wal-archive mode; runs as a NEW service beside the old one; the CLI waits until it reaches the moment, the tool returns at once (follow `releases`) |
 | a port held open | `pilot proxy` | for a tool that is not a shell |
 | several Postgres machines | `pilot db ha enable <service>` | Patroni, with its own etcd; five machines at the smallest useful size |
 | which node is primary | `pilot db ha status <service>` | asks every node, because two that both claim it is the thing worth seeing |
@@ -83,16 +83,19 @@ The default is the first, because sixty seconds of exposure on a machine that ha
 
 `pilot db restore` replays the write-ahead log onto the newest base backup at or before the moment you name, as a NEW private service on a FORK of the archive volume. The original keeps serving throughout, so you can query both and compare before pointing anything at either. `pg_isready` passes only after the recovery promotes, so the release health gate is the restore gate: a recovery that never reaches its target never becomes a running release.
 
-How far back you can go is bounded by the oldest base backup the archive still holds, which is four weeks by default.
+How far back you can go is bounded by the oldest base backup the archive still holds, which is four weeks by default. Retention is a window rather than a count, so frequent redeploys never shrink it.
+
+A redeploy of a default-mode Postgres takes a fresh base backup in the old replica before it stops, so the new one replays seconds of log, not a week of it. A project whose database was added before a recipe change picks up the new generated scripts with `pilot add postgres --refresh` (`add_database` with `refresh`), which leaves the compose file and the password alone.
 
 ## The tools
 
 | I need to... | Tool | Note |
 | --- | --- | --- |
-| find a service | `list_services` | url, release id, replica count |
+| find a service | `list_services` | url, release id, replica count; `labels` narrows to services carrying them |
 | one service in full | `service` | health check, env KEYS (never values), domain, replica ids |
 | what has been deployed | `releases` | newest first, with `healthy` and the build each came from |
 | put the previous release back | `rollback` | changes what is serving; confirm first |
+| remove a service for good | `delete_service` | every replica, domain and release; volumes kept unless `delete_volumes`; idempotent; confirm first |
 | a replica's console | `logs` | pass a replica id from `service` |
 | where a database is | `database` | engine, addresses and the machine to exec in; never a password |
 

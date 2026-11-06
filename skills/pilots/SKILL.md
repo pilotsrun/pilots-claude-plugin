@@ -26,15 +26,19 @@ No `pilot` on PATH: `curl -fsSL https://pilots.run/install.sh | sh`, or `npm ins
 | get a URL for this directory | `deploy` with `dir` | writing a Dockerfile or compose file first | references/deploy.md |
 | see what a deploy would do | `plan` | reading the repo to guess the framework | references/deploy.md |
 | a throwaway environment to run commands in | `create_machine` then `exec` | deploying a service | references/sandboxes.md |
+| leave a dev server, a build or an agent run going | `process_start`, then `process_output` by offset | `exec` with `nohup ... &` and a tail of a log file | references/sandboxes.md |
+| a file in or out of a machine | `file_read`, `file_write`, `file_list` | base64 through `exec` | references/sandboxes.md |
 | keep a sandbox as a production thing | `promote` | creating a service and copying files | references/promote.md |
 | a second service, a database, a queue | a compose file, then `deploy` | several `deploy` calls with copied ids | references/compose.md |
 | a password or token in the environment | `secret://` in compose, `pilot secret` | pasting the value into env | references/secrets.md |
 | data that survives a redeploy | a volume in compose | writing into the rootfs | references/volumes.md |
 | my own hostname | `pilot domain add` | a DNS record with no verification | references/domains.md |
+| every address of my team on my own domain | `pilot org domain set` | a custom domain per service | references/domains.md |
 | Claude Code running INSIDE a machine | tell the user to run `pilot claude <machine>` | passing an Anthropic key through `exec` env, or asking the user to log in inside the machine | references/agents.md |
 | find out why the deploy failed | the error's `code`, `next`, `details`, then `diagnose` | re-running the deploy | references/errors.md |
 | logs of a running service | `service` then `logs` on a replica | `exec` with tail | references/services.md |
-| connect an editor or another agent to this fleet | `pilot mcp install <harness>` | pasting a token into a config by hand | references/agents.md |
+| connect an editor or another agent to this fleet | `pilot setup`, or `pilot mcp install <harness>` | pasting a token into a config by hand | references/agents.md |
+| know what this key may do before trying | `init` (its `grant`), or `pilot whoami` | trying a call to see whether it is refused | references/errors.md |
 
 ## Load only the reference you need
 
@@ -58,7 +62,7 @@ One reference is usually enough; two at most.
 1. Prefer the MCP tools. The CLI with `--json` is the same surface.
 2. Resolve the directory before anything else. No directory and no repository in the conversation means ask; never invent one.
 3. Read `next` on every result and every error, and do that.
-4. A destructive tool, `destroy_machine` or `rollback`, is confirmed with the user first.
+4. A destructive tool, `destroy_machine`, `delete_service`, `delete_volume`, `delete_checkpoint`, `restore`, `restore_volume`, `secret_remove` or `rollback`, is confirmed with the user first.
 5. After a mutation, read it back with `service` or `status`.
 6. Never read source to deploy. The platform's answer is complete, or it says what is missing.
 

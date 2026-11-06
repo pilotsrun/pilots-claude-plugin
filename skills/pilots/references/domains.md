@@ -32,6 +32,21 @@ MCP: `domains` lists what exists and whether each is verified. ADDING one is the
 | `verified: false` | the DNS record is not visible yet | tell the user which record to create; DNS takes minutes |
 | `bad_request` about the fleet domain | the hostname is under the fleet's own apex | use a name the user owns |
 
+## A domain for the whole team
+
+Every machine and service of a team can be addressed under one domain the team owns, instead of the fleet's: `<name>.apps.example.com` and `<port>-<name>.apps.example.com`.
+
+    pilot org domain set apps.example.com
+
+MCP: `team_domain` reads it, `team_domain_set` sets it, `team_domain_remove` removes it. The answer lists two records for the user to create, DNS only (not proxied):
+
+| Record | Points at | Why |
+| --- | --- | --- |
+| `*.apps.example.com` CNAME | the fleet's API hostname | sends every name under the domain to the fleet |
+| `_acme-challenge.apps.example.com` CNAME | `apps.example.com._acme.<fleet domain>` | lets the fleet obtain and renew the wildcard certificate without access to the team's zone |
+
+Addresses move to the domain once both resolve. Every `<name>.<fleet domain>` address keeps working. Only the team's own machines and services answer under its domain, and no other team can take it or attach a custom domain under it. Setting the same domain again checks the records again.
+
 ## Do not
 
 - Do not add a domain for the user. Print the command and the record.

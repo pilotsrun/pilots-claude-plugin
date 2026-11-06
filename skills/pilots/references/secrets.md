@@ -56,10 +56,11 @@ So a machine ASKS. hostd binds a broker inside each machine's own network namesp
 | I need to... | Do |
 | --- | --- |
 | let a machine call the API | `grant` with `scopes: ["machines"]` |
+| let a machine watch its team and change nothing | `grant` with `scopes: ["read"]`: lists, state, metrics, releases and logs, no exec, no files, no writes |
 | let a service's replicas call it | `grant` with a `service` and the scopes; every later deploy inherits it |
-| give a machine a secret | `grant` with `secrets: {NAME: value}` |
+| give a machine a secret | the USER runs `pilot machine grant set <machine> --secret NAME=value` (or `pilot service grant set`): a value must not pass through you, so the `grant` tool takes scopes only, and refuses scopes on a target that already holds secrets |
 | see what is granted | `grants` (names and scopes, never values) |
-| take it away | `grant` with an empty request |
+| take it away | `grant` with `clear: true` |
 
 ### Inside the machine
 

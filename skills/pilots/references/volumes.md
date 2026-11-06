@@ -38,7 +38,7 @@ Then `pilot deploy`. MCP: `volumes` lists what exists.
 
 | Answer | Meaning | Do |
 | --- | --- | --- |
-| `volume_in_use`, 409 | something else holds it | `next` names what: destroy that machine, or detach it from that service |
+| `volume_in_use`, 409 | something else holds it | `next` names what: destroy that machine, or `delete_service` the service that mounts it (its volumes are detached and kept) |
 | `bad_request` about replicas | a volume-backed service was asked for more than one replica | drop the replicas, or drop the volume |
 
 ## Do not

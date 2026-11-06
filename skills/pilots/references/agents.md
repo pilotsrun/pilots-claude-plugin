@@ -5,16 +5,37 @@ Two ways in, and the difference is what the agent can reach.
 ## Hosted: every host serves `/mcp`
 
 ```
-pilot login
+pilot setup
+```
+
+One command for a machine: it detects the coding agents installed, shows the
+plan, asks once, installs the skill where each loads skills from, registers
+the hosted server in each one's config, and says whether the machine is
+signed in (`pilot login` if not; setup opens no browser itself). Idempotent.
+`--agent a,b` narrows it, `--skip-skills` and `--skip-mcp` leave a half out,
+`--json` answers per agent.
+
+One agent at a time:
+
+```
 pilot mcp install <harness>
 ```
 
 `pilot mcp install --list` names the harnesses it knows: `claude-code`,
 `codex`, `cursor`, `vscode`, `opencode`, `windsurf`, `gemini`, `zed`,
-`claude-desktop`, and `generic` for anything else. Each writes the server
-entry into that agent's own config file, in that agent's own shape, merged
-with what is already there. `--project` writes the repository-scoped file
-instead of the user-wide one, and `--print` shows the entry without writing.
+`copilot`, `droid`, `antigravity`, `pi`, `claude-desktop`, and `generic` for
+anything else. Each writes the server entry into that agent's own config
+file, in that agent's own shape, merged with what is already there.
+`--project` writes the repository-scoped file instead of the user-wide one,
+`--print` shows the entry without writing, and `pilot mcp remove <harness>`
+takes it out again.
+
+The entry carries no key where the agent signs in itself (every harness
+above except VS Code, Windsurf, Claude Desktop and `generic`): the fleet's
+401 starts a browser sign-in inside the agent, and the token it gets is the
+agent's own, limited to what was granted on the consent screen. `--key`
+writes the key from `pilot login` into the file instead, for a machine with
+no browser.
 
 Any MCP client can also be pointed at the URL by hand:
 
@@ -27,13 +48,18 @@ The endpoint is Streamable HTTP, stateless, on every host of the fleet. There
 is no gateway and no session pinned to one machine, so a client that reconnects
 to a different host loses nothing.
 
-**Twenty-five tools**, everything that needs only the API: `create_machine`,
+**The hosted tools** are everything that needs only the API: `create_machine`,
 `list_machines`, `status`, `exec`, `exec_stream`, `logs`, `metrics`,
-`checkpoint`, `restore`, `fork`, `promote`, `destroy_machine`, `build_logs`,
-`list_services`, `service`, `releases`, `rollback`, `domains`, `volumes`,
-`database`, `grant`, `grants`, `diagnose`, `init`, `docs`.
+`checkpoint`, `restore`, `fork`, `preview_url`, `promote`, `destroy_machine`, `build_logs`,
+`list_services`, `service`, `releases`, `rollback`, `delete_service`, `domains`, `volumes`,
+`delete_volume`, `database`, `grant`, `grants`, `diagnose`, `init`, `docs`; the processes API,
+`process_start`, `process_status`, `processes`, `process_output`,
+`process_signal`, `process_remove`; and the files API, `file_read`,
+`file_write`, `file_list`, `file_remove`. `process_start` takes no `env`, on
+purpose: a value there would pass through the model, so a secret reaches a
+process from `pilot process start --env`, which the user runs.
 
-## Stdio: `pilot mcp`, and six more tools
+## Stdio: `pilot mcp`, and seven more tools
 
 ```
 pilot mcp install <harness> --stdio
@@ -41,7 +67,8 @@ pilot mcp install <harness> --stdio
 
 Runs the server as a local process, which adds the tools that read the agent's
 own filesystem: `deploy` (a directory to a URL in one call), `build`, `plan`,
-`generate_dockerfile`, `push_file` and `pull_file`. Use this one when the agent
+`generate_dockerfile`, `add_database` (`pilot add`: the password stays on this
+computer and never appears in the answer), `push_file` and `pull_file`. Use this one when the agent
 is working in a checkout. The hosted server's `init` tool says so too, so an
 agent that finds `deploy` missing is told where it is rather than guessing.
 
@@ -54,16 +81,21 @@ person approves it on a consent screen. What comes back is an ordinary pilots
 token, so nothing on the fleet learns a second credential type and revoking it
 on the tokens page stops it everywhere.
 
-The consent screen offers three restrictions, and the fleet enforces all three:
+The consent screen offers two restrictions, and the fleet enforces both:
 
 | Restriction | What it does |
 | --- | --- |
 | name prefix | Every machine and service this token names must start with it. The default is `mcp-`. |
-| machine cap | How many machines with that prefix may exist at once, counted at create time. |
 | expiry | When the token stops authenticating, checked on every request. |
 
 A refusal says which one was hit and what would work instead: a name outside
-the prefix comes back with the prefixed name spelled out.
+the prefix comes back with the prefixed name spelled out. There is no machine
+count: no token, team or plan is held to one.
+
+The same two limits are minted from the terminal with `pilot key create
+<name> --prefix <p> --expires 7d`, and `pilot whoami` shows the current key's
+prefix and expiry, which is how an agent reads what it was granted. `--scope
+read` mints a key that sees the whole team and changes nothing.
 
 ## The Claude Code plugin
 
@@ -78,7 +110,9 @@ read `PILOT_API_KEY` (Claude Code hides it from a plugin); headless, run
 `pilot login --token <key>`. `PILOT_API_URL` points it at a self-hosted fleet.
 
 Adds the hosted server, this skill, `/pilots:status`, `/pilots:smoke`, and a
-hook that asks before `destroy_machine`, `restore` and `rollback`, and before
+hook that asks before `destroy_machine`, `delete_service`, `delete_volume`,
+`delete_checkpoint`, `restore`, `restore_volume`, `secret_remove`
+and `rollback`, and before
 an `exec` that ought to be checkpointed first (a migration, a package upgrade,
 a recursive delete). Cursor, Codex, Copilot and Kiro read the portable Agent
 Plugins v1 manifest in the same directory.

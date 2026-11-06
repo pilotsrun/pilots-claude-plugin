@@ -24,6 +24,10 @@ DESTRUCTIVE_TOOLS = {
         "Destroying a machine deletes its disk, checkpoints and URL. There is no "
         "undo. Confirm the exact machine name or id."
     ),
+    "delete_checkpoint": (
+        "Deleting a checkpoint removes that saved moment for good: nothing can "
+        "restore or fork from it afterwards. Confirm the checkpoint id."
+    ),
     "restore": (
         "Restoring a checkpoint discards every change made after it, in place, "
         "on the same machine. Confirm the machine and the checkpoint id."
@@ -31,6 +35,24 @@ DESTRUCTIVE_TOOLS = {
     "rollback": (
         "Rolling back changes what the service's URL serves right now. Confirm "
         "the service and which release it will return to."
+    ),
+    "delete_service": (
+        "Deleting a service destroys every replica and release, releases its "
+        "custom domains and stops its URL. With delete_volumes its data goes "
+        "too. There is no undo. Confirm the service and whether its volumes go."
+    ),
+    "delete_volume": (
+        "Deleting a volume removes its data and every snapshot of it from "
+        "object storage. There is no undo. Confirm the exact volume."
+    ),
+    "restore_volume": (
+        "Restoring a volume snapshot throws away everything written to the "
+        "volume since it was taken, and nothing keeps a copy. Confirm the "
+        "volume and the snapshot."
+    ),
+    "secret_remove": (
+        "Removing a secret forgets its value on this computer; nothing keeps a "
+        "copy. Confirm the app and the secret name."
     ),
 }
 
